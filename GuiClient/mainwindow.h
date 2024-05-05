@@ -3,6 +3,7 @@
 
 #include <QMainWindow>
 #include <Windows.h>
+#include <QIcon>
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -19,6 +20,8 @@ public:
     ~MainWindow();
 
 private:
+    BOOL adminRights = FALSE;
+
     Ui::MainWindow *ui;
     BOOL IsAppRunningAsAdminMode();
 };

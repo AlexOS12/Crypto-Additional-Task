@@ -7,10 +7,17 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    if (IsAppRunningAsAdminMode()) {
-        ui->label->setText("ADMIN :)");
+    adminRights = IsAppRunningAsAdminMode();
+
+    if (adminRights) {
+        setWindowTitle("[ADMIN] PassThrough Settings");
+        ui->adminIcoLabel->hide();
+        ui->adminStatusLabel->hide();
+        ui->RedButton->setIcon(QIcon(":/icons/admin.png"));
     } else {
-        ui->label->setText(("NOT ADMIN :("));
+        setWindowTitle("PassThrough Settings");
+        ui->RedButton->setEnabled(false);
+        ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
     }
 }
 
