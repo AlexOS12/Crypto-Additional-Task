@@ -19,11 +19,57 @@ MainWindow::MainWindow(QWidget *parent)
         ui->RedButton->setEnabled(false);
         ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
     }
+
+    this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
+
+    if (ReadSettings()) {
+        ui->KeyLineEdit->setText(this->current.key);
+        ui->ExtensionEdit->setText(this->current.extension);
+    }
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+}
+
+bool MainWindow::ReadSettings()
+{
+    QFile file;
+    file.setFileName(this->settingsFilePath);
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    try {
+        QString key = file.readLine().trimmed();
+        QString extension = file.readLine().trimmed();
+
+        PTSettings sets(key, extension);
+
+        this->current = sets;
+        this->old = sets;
+    } catch (...) {
+        return false;
+    }
+
+}
+
+bool MainWindow::WriteSettings()
+{
+    QFile file;
+    file.setFileName(this->settingsFilePath);
+
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        return false;
+    }
+
+    try {
+        file.write((this->current.key + "\n" + this->current.extension).toUtf8());
+    } catch (...) {
+        return false;
+    }
 }
 
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
@@ -75,3 +121,22 @@ Cleanup:
 
     return fIsRunAsAdmin;
 }
+
+void MainWindow::on_cancelButton_clicked()
+{
+    this->current = this->old;
+    ui->KeyLineEdit->setText(current.key);
+    ui->ExtensionEdit->setText(current.extension);
+}
+
+
+void MainWindow::on_applyButton_clicked()
+{
+    this->current.key = ui->KeyLineEdit->text();
+    this->current.extension = ui->ExtensionEdit->text();
+
+    this->old = current;
+
+    WriteSettings();
+}
+
