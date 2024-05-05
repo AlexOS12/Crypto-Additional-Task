@@ -25,6 +25,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         ${PROJECT_SOURCES}
         resources.qrc
         PTSettings.h
+        encryptor.cpp encryptor.h
 
     )
 # Define target properties for Android with Qt 6 as:
@@ -46,6 +47,19 @@ else()
 endif()
 
 target_link_libraries(GuiClient PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
+
+if (WIN32)
+    set(OPENSSL_ROOT_DIR "C:/Qt/Tools/OpenSSLv3/Win_x64/lib")
+    set(OPENSSL_INCLUDE_DIR "C:/Qt/Tools/OpenSSLv3/Win_x64/include")
+    find_package(OpenSSL REQUIRED)
+elseif (UNIX)
+    include(FindOpenSSL)
+endif()
+
+target_link_libraries(
+GuiClient
+PRIVATE
+${CMAKE_DL_LIBS} OpenSSL::SSL OpenSSL::Crypto)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

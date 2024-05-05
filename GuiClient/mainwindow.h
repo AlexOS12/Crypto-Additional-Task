@@ -7,8 +7,10 @@
 #include <QString>
 #include <QDir>
 #include <QFile>
+#include <QCryptographicHash>
 
 #include "PTSettings.h"
+#include "encryptor.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -38,7 +40,14 @@ private:
 
     PTSettings current, old;
 
+    // Ключ может пока временный
+    QByteArray key = QCryptographicHash::hash("temp_key", QCryptographicHash::Sha256);
+    // Как и IV
+    QByteArray iv = QCryptographicHash::hash("temp_iv", QCryptographicHash::Md5);
+
     Ui::MainWindow *ui;
     BOOL IsAppRunningAsAdminMode();
+
+
 };
 #endif // MAINWINDOW_H

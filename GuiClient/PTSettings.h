@@ -17,6 +17,10 @@ struct PTSettings {
 
     PTSettings(){};
 
+    QString toString() {
+        return this->key + "\n" + this->extension;
+    }
+
     QString key;
     QString extension;
 };

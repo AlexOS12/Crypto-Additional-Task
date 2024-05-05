@@ -43,16 +43,22 @@ bool MainWindow::ReadSettings()
     }
 
     try {
-        QString key = file.readLine().trimmed();
-        QString extension = file.readLine().trimmed();
+        QByteArray encrypted = file.readAll();
+        QByteArray decrypted;
 
-        PTSettings sets(key, extension);
+        Encryptor::getInstance().decrypt(encrypted, decrypted, this->key, this->iv);
+
+        QList<QByteArray> parts = decrypted.split('\n');
+
+        PTSettings sets(parts[0], parts[1]);
 
         this->current = sets;
         this->old = sets;
     } catch (...) {
         return false;
     }
+
+    return true;
 
 }
 
@@ -66,10 +72,17 @@ bool MainWindow::WriteSettings()
     }
 
     try {
-        file.write((this->current.key + "\n" + this->current.extension).toUtf8());
+        QByteArray settings = this->current.toString().toUtf8();
+        QByteArray encrypted;
+
+        Encryptor::getInstance().encrypt(settings, encrypted, this->key, this->iv);
+
+        file.write(encrypted);
     } catch (...) {
         return false;
     }
+
+    return true;
 }
 
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
