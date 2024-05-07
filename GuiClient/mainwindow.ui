@@ -7,19 +7,19 @@
     <x>0</x>
     <y>0</y>
     <width>350</width>
-    <height>300</height>
+    <height>350</height>
    </rect>
   </property>
   <property name="minimumSize">
    <size>
     <width>350</width>
-    <height>300</height>
+    <height>350</height>
    </size>
   </property>
   <property name="maximumSize">
    <size>
     <width>350</width>
-    <height>300</height>
+    <height>350</height>
    </size>
   </property>
   <property name="windowTitle">
@@ -100,6 +100,17 @@
      <widget class="QPushButton" name="RedButton">
       <property name="text">
        <string>Включить драйвер</string>
+      </property>
+      <property name="icon">
+       <iconset resource="resources.qrc">
+        <normaloff>:/icons/non_admin.png</normaloff>:/icons/non_admin.png</iconset>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <widget class="QPushButton" name="reloadDriverBtn">
+      <property name="text">
+       <string>Перезапустить драйвер</string>
       </property>
       <property name="icon">
        <iconset resource="resources.qrc">

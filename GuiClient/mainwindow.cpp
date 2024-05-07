@@ -14,10 +14,13 @@ MainWindow::MainWindow(QWidget *parent)
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
         ui->RedButton->setIcon(QIcon(":/icons/admin.png"));
+        ui->reloadDriverBtn->setIcon(QIcon(":/icons/admin.png"));
     } else {
         setWindowTitle("PassThrough Settings");
         ui->RedButton->setEnabled(false);
         ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
+        ui->reloadDriverBtn->setEnabled(false);
+        ui->reloadDriverBtn->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
     }
 
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
@@ -151,5 +154,12 @@ void MainWindow::on_applyButton_clicked()
     this->old = current;
 
     WriteSettings();
+}
+
+
+void MainWindow::on_reloadDriverBtn_clicked()
+{
+    // TODO
+    // Реализовать перезапуска драйвера тут
 }
 

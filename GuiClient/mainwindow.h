@@ -31,6 +31,8 @@ private slots:
 
     void on_applyButton_clicked();
 
+    void on_reloadDriverBtn_clicked();
+
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
