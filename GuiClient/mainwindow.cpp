@@ -9,19 +9,26 @@ MainWindow::MainWindow(QWidget *parent)
 
     adminRights = IsAppRunningAsAdminMode();
 
+    createTrayIcon();
+
     if (adminRights) {
         setWindowTitle("[ADMIN] PassThrough Settings");
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
         ui->RedButton->setIcon(QIcon(":/icons/admin.png"));
         ui->reloadDriverBtn->setIcon(QIcon(":/icons/admin.png"));
+        this->trayIcon->setIcon(QIcon(":/icons/admin.png"));
     } else {
         setWindowTitle("PassThrough Settings");
         ui->RedButton->setEnabled(false);
         ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
         ui->reloadDriverBtn->setEnabled(false);
         ui->reloadDriverBtn->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
+        this->trayIcon->setIcon(QIcon(":/icons/non_admin.png"));
     }
+
+
+    trayIcon->show();
 
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
@@ -138,6 +145,21 @@ Cleanup:
     return fIsRunAsAdmin;
 }
 
+void MainWindow::createTrayIcon()
+{
+    this->trayIcon = new QSystemTrayIcon(this);
+    connect(this->trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+}
+
+void MainWindow::createAction()
+{
+    this->MinimazeAction = new QAction(tr("Mi&nimize"), this);
+    connect(MinimazeAction, &QAction::triggered, this, &QWidget::hide);
+
+    this->RestoreAction = new QAction(tr("&Restore"), this);
+    connect(RestoreAction, &QAction::triggered, this, &QWidget::showNormal);
+}
+
 void MainWindow::on_cancelButton_clicked()
 {
     this->current = this->old;
@@ -161,5 +183,16 @@ void MainWindow::on_reloadDriverBtn_clicked()
 {
     // TODO
     // Реализовать перезапуска драйвера тут
+}
+
+void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason) {
+    case QSystemTrayIcon::DoubleClick:
+        this->show();
+        break;
+    default:
+        break;
+    }
 }
 

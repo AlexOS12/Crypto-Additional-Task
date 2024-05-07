@@ -8,6 +8,9 @@
 #include <QDir>
 #include <QFile>
 #include <QCryptographicHash>
+#include <QSystemTrayIcon>
+#include <QAction>
+#include <QMenu>
 
 #include "PTSettings.h"
 #include "encryptor.h"
@@ -33,6 +36,8 @@ private slots:
 
     void on_reloadDriverBtn_clicked();
 
+    void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
+
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
@@ -50,6 +55,12 @@ private:
     Ui::MainWindow *ui;
     BOOL IsAppRunningAsAdminMode();
 
+    QSystemTrayIcon *trayIcon;
 
+    QAction *MinimazeAction;
+    QAction *RestoreAction;
+
+    void createTrayIcon();
+    void createAction();
 };
 #endif // MAINWINDOW_H
