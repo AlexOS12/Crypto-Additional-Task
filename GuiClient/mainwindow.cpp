@@ -96,6 +96,14 @@ bool MainWindow::WriteSettings()
     return true;
 }
 
+bool MainWindow::ReloadDriver()
+{
+    // TODO
+    // Реализовать перезапуска драйвера тут
+    qDebug() << "Imagine driver is reloading...";
+    return true;
+}
+
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
 {
     BOOL fIsRunAsAdmin = FALSE;
@@ -153,6 +161,7 @@ void MainWindow::createTrayIcon()
 
     trayIconMenu = new QMenu(this);
     trayIconMenu->addAction(RestoreAction);
+    trayIconMenu->addAction(ReloadDriverAction);
     trayIconMenu->addAction(CloseAction);
 
     trayIcon->setContextMenu(trayIconMenu);
@@ -164,6 +173,17 @@ void MainWindow::createActions()
 
     this->RestoreAction = new QAction(tr("&Restore"), this);
     connect(RestoreAction, &QAction::triggered, this, &QWidget::showNormal);
+
+    this->ReloadDriverAction = new QAction(tr("&Reload Driver"), this);
+
+    if (this->adminRights) {
+        ReloadDriverAction->setIcon(QIcon(":/icons/admin.png"));
+    } else {
+        ReloadDriverAction->setIcon(QIcon(":/icons/non_admin.png"));
+        ReloadDriverAction->setEnabled(false);
+    }
+
+    connect(ReloadDriverAction, &QAction::triggered, this, &MainWindow::reloadDriverSlot);
 
     this->CloseAction = new QAction(tr("&Exit"), this);
     connect(CloseAction, &QAction::triggered, this, &QApplication::exit);
@@ -187,11 +207,9 @@ void MainWindow::on_applyButton_clicked()
     WriteSettings();
 }
 
-
 void MainWindow::on_reloadDriverBtn_clicked()
 {
-    // TODO
-    // Реализовать перезапуска драйвера тут
+    ReloadDriver();
 }
 
 void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
@@ -203,5 +221,10 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
     default:
         break;
     }
+}
+
+void MainWindow::reloadDriverSlot()
+{
+    ReloadDriver();
 }
 

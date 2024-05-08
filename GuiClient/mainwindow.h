@@ -38,12 +38,15 @@ private slots:
 
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
 
+    void reloadDriverSlot();
+
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
 
     bool ReadSettings();
     bool WriteSettings();
+    bool ReloadDriver();
 
     PTSettings current, old;
 
@@ -60,6 +63,7 @@ private:
 
     QAction *RestoreAction;
     QAction *CloseAction;
+    QAction *ReloadDriverAction;
 
     void createTrayIcon();
     void createActions();
