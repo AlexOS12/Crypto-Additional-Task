@@ -101,6 +101,21 @@ bool MainWindow::ReloadDriver()
     // TODO
     // Реализовать перезапуска драйвера тут
     qDebug() << "Imagine driver is reloading...";
+    showNotification("Reloading Driver", "Imagine Driver is reloading...");
+    return true;
+}
+
+bool MainWindow::LoadDriver()
+{
+    qDebug() << "Imagine driver is loading...";
+    showNotification("Driver Loading", "Imagine driver is loading...");
+    return true;
+}
+
+bool MainWindow::UnloadDriver()
+{
+    qDebug() << "Imagine driver is unloading...";
+    showNotification("Driver Unloading", "Imagine driver is unloading...");
     return true;
 }
 
@@ -189,6 +204,11 @@ void MainWindow::createActions()
     connect(CloseAction, &QAction::triggered, this, &QApplication::exit);
 }
 
+void MainWindow::showNotification(QString title, QString text)
+{
+    this->trayIcon->showMessage(title, text, QIcon(":/icons/admin.png"), 5'000);
+}
+
 void MainWindow::on_cancelButton_clicked()
 {
     this->current = this->old;
@@ -226,5 +246,16 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void MainWindow::reloadDriverSlot()
 {
     ReloadDriver();
+}
+
+
+void MainWindow::on_RedButton_clicked()
+{
+    LoadDriver();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    showNotification("App is still running", "This app is still running in the background. To access it use tray icon");
 }
 

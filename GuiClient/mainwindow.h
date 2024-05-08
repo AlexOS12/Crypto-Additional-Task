@@ -11,6 +11,7 @@
 #include <QSystemTrayIcon>
 #include <QAction>
 #include <QMenu>
+#include <QCloseEvent>
 
 #include "PTSettings.h"
 #include "encryptor.h"
@@ -40,13 +41,18 @@ private slots:
 
     void reloadDriverSlot();
 
+    void on_RedButton_clicked();
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
 
+    void closeEvent(QCloseEvent *event);
+
     bool ReadSettings();
     bool WriteSettings();
     bool ReloadDriver();
+    bool LoadDriver();
+    bool UnloadDriver();
 
     PTSettings current, old;
 
@@ -67,5 +73,7 @@ private:
 
     void createTrayIcon();
     void createActions();
+
+    void showNotification(QString title, QString text);
 };
 #endif // MAINWINDOW_H
