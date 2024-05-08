@@ -56,11 +56,12 @@ private:
     BOOL IsAppRunningAsAdminMode();
 
     QSystemTrayIcon *trayIcon;
+    QMenu *trayIconMenu;
 
-    QAction *MinimazeAction;
     QAction *RestoreAction;
+    QAction *CloseAction;
 
     void createTrayIcon();
-    void createAction();
+    void createActions();
 };
 #endif // MAINWINDOW_H

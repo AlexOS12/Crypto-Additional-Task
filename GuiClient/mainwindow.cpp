@@ -9,6 +9,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     adminRights = IsAppRunningAsAdminMode();
 
+    createActions();
     createTrayIcon();
 
     if (adminRights) {
@@ -149,15 +150,23 @@ void MainWindow::createTrayIcon()
 {
     this->trayIcon = new QSystemTrayIcon(this);
     connect(this->trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+
+    trayIconMenu = new QMenu(this);
+    trayIconMenu->addAction(RestoreAction);
+    trayIconMenu->addAction(CloseAction);
+
+    trayIcon->setContextMenu(trayIconMenu);
+
 }
 
-void MainWindow::createAction()
+void MainWindow::createActions()
 {
-    this->MinimazeAction = new QAction(tr("Mi&nimize"), this);
-    connect(MinimazeAction, &QAction::triggered, this, &QWidget::hide);
 
     this->RestoreAction = new QAction(tr("&Restore"), this);
     connect(RestoreAction, &QAction::triggered, this, &QWidget::showNormal);
+
+    this->CloseAction = new QAction(tr("&Exit"), this);
+    connect(CloseAction, &QAction::triggered, this, &QApplication::exit);
 }
 
 void MainWindow::on_cancelButton_clicked()
