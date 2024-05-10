@@ -9,19 +9,27 @@ MainWindow::MainWindow(QWidget *parent)
 
     adminRights = IsAppRunningAsAdminMode();
 
+    createActions();
+    createTrayIcon();
+
     if (adminRights) {
         setWindowTitle("[ADMIN] PassThrough Settings");
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
         ui->RedButton->setIcon(QIcon(":/icons/admin.png"));
         ui->reloadDriverBtn->setIcon(QIcon(":/icons/admin.png"));
+        this->trayIcon->setIcon(QIcon(":/icons/admin.png"));
     } else {
         setWindowTitle("PassThrough Settings");
         ui->RedButton->setEnabled(false);
         ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
         ui->reloadDriverBtn->setEnabled(false);
         ui->reloadDriverBtn->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
+        this->trayIcon->setIcon(QIcon(":/icons/non_admin.png"));
     }
+
+
+    trayIcon->show();
 
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
@@ -88,6 +96,29 @@ bool MainWindow::WriteSettings()
     return true;
 }
 
+bool MainWindow::ReloadDriver()
+{
+    // TODO
+    // Реализовать перезапуска драйвера тут
+    qDebug() << "Imagine driver is reloading...";
+    showNotification("Reloading Driver", "Imagine Driver is reloading...");
+    return true;
+}
+
+bool MainWindow::LoadDriver()
+{
+    qDebug() << "Imagine driver is loading...";
+    showNotification("Driver Loading", "Imagine driver is loading...");
+    return true;
+}
+
+bool MainWindow::UnloadDriver()
+{
+    qDebug() << "Imagine driver is unloading...";
+    showNotification("Driver Unloading", "Imagine driver is unloading...");
+    return true;
+}
+
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
 {
     BOOL fIsRunAsAdmin = FALSE;
@@ -138,6 +169,46 @@ Cleanup:
     return fIsRunAsAdmin;
 }
 
+void MainWindow::createTrayIcon()
+{
+    this->trayIcon = new QSystemTrayIcon(this);
+    connect(this->trayIcon, &QSystemTrayIcon::activated, this, &MainWindow::trayIconActivated);
+
+    trayIconMenu = new QMenu(this);
+    trayIconMenu->addAction(RestoreAction);
+    trayIconMenu->addAction(ReloadDriverAction);
+    trayIconMenu->addAction(CloseAction);
+
+    trayIcon->setContextMenu(trayIconMenu);
+
+}
+
+void MainWindow::createActions()
+{
+
+    this->RestoreAction = new QAction(tr("&Restore"), this);
+    connect(RestoreAction, &QAction::triggered, this, &QWidget::showNormal);
+
+    this->ReloadDriverAction = new QAction(tr("&Reload Driver"), this);
+
+    if (this->adminRights) {
+        ReloadDriverAction->setIcon(QIcon(":/icons/admin.png"));
+    } else {
+        ReloadDriverAction->setIcon(QIcon(":/icons/non_admin.png"));
+        ReloadDriverAction->setEnabled(false);
+    }
+
+    connect(ReloadDriverAction, &QAction::triggered, this, &MainWindow::reloadDriverSlot);
+
+    this->CloseAction = new QAction(tr("&Exit"), this);
+    connect(CloseAction, &QAction::triggered, this, &QApplication::exit);
+}
+
+void MainWindow::showNotification(QString title, QString text)
+{
+    this->trayIcon->showMessage(title, text, QIcon(":/icons/admin.png"), 5'000);
+}
+
 void MainWindow::on_cancelButton_clicked()
 {
     this->current = this->old;
@@ -156,10 +227,35 @@ void MainWindow::on_applyButton_clicked()
     WriteSettings();
 }
 
-
 void MainWindow::on_reloadDriverBtn_clicked()
 {
-    // TODO
-    // Реализовать перезапуска драйвера тут
+    ReloadDriver();
+}
+
+void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
+{
+    switch (reason) {
+    case QSystemTrayIcon::DoubleClick:
+        this->show();
+        break;
+    default:
+        break;
+    }
+}
+
+void MainWindow::reloadDriverSlot()
+{
+    ReloadDriver();
+}
+
+
+void MainWindow::on_RedButton_clicked()
+{
+    LoadDriver();
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    showNotification("App is still running", "This app is still running in the background. To access it use tray icon");
 }
 

@@ -8,6 +8,10 @@
 #include <QDir>
 #include <QFile>
 #include <QCryptographicHash>
+#include <QSystemTrayIcon>
+#include <QAction>
+#include <QMenu>
+#include <QCloseEvent>
 
 #include "PTSettings.h"
 #include "encryptor.h"
@@ -33,12 +37,22 @@ private slots:
 
     void on_reloadDriverBtn_clicked();
 
+    void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
+
+    void reloadDriverSlot();
+
+    void on_RedButton_clicked();
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
 
+    void closeEvent(QCloseEvent *event);
+
     bool ReadSettings();
     bool WriteSettings();
+    bool ReloadDriver();
+    bool LoadDriver();
+    bool UnloadDriver();
 
     PTSettings current, old;
 
@@ -50,6 +64,16 @@ private:
     Ui::MainWindow *ui;
     BOOL IsAppRunningAsAdminMode();
 
+    QSystemTrayIcon *trayIcon;
+    QMenu *trayIconMenu;
 
+    QAction *RestoreAction;
+    QAction *CloseAction;
+    QAction *ReloadDriverAction;
+
+    void createTrayIcon();
+    void createActions();
+
+    void showNotification(QString title, QString text);
 };
 #endif // MAINWINDOW_H
