@@ -22,11 +22,40 @@ Environment:
 #include <dontuse.h>
 #include <suppress.h>
 #include "aes.h"
+#include <stdio.h>
+//#include <fileapi.h>
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
+PFLT_PORT ServerPort;
+PFLT_PORT ClientPort;
+
 uint8_t* KEY[32];
 uint8_t* IV[16];
+
+NTSTATUS
+ClientMessage(
+	_In_ PVOID ConnectionCookie,
+	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+	_In_ ULONG InputBufferSize,
+	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
+	_In_ ULONG OutputBufferSize,
+	_Out_ PULONG ReturnOutputBufferLength
+);
+
+NTSTATUS
+ClientConnect(
+	_In_ PFLT_PORT ClientPort,
+	_In_ PVOID ServerPortCookie,
+	_In_reads_bytes_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Flt_ConnectionCookie_Outptr_ PVOID* ConnectionCookie
+);
+
+VOID
+ClientDisconnect(
+	_In_opt_ PVOID ConnectionCookie
+);
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
@@ -130,6 +159,9 @@ PtDoRequestOperationStatus(
 #pragma alloc_text(PAGE, PtInstanceSetup)
 #pragma alloc_text(PAGE, PtInstanceTeardownStart)
 #pragma alloc_text(PAGE, PtInstanceTeardownComplete)
+#pragma alloc_text(PAGE, ClientConnect)
+#pragma alloc_text(PAGE, ClientDisconnect)
+#pragma alloc_text(PAGE, ClientMessage)
 #endif
 
 //
@@ -552,10 +584,6 @@ Return Value:
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	//
-	//  Register with FltMgr to tell it our callback routines
-	//
-
 	status = FltRegisterFilter(DriverObject,
 		&FilterRegistration,
 		&gFilterHandle);
@@ -564,26 +592,295 @@ Return Value:
 
 	if (NT_SUCCESS(status)) {
 
-		//
-		//  Start filtering i/o
-		//
-
+		DbgPrint("[PassThrough] DriverEntry\n");
 		status = FltStartFiltering(gFilterHandle);
+
+		if (!NT_SUCCESS(status))
+		{
+			DbgPrint("[PassThrough] Can`t start!\n");
+			FltUnregisterFilter(gFilterHandle);
+			return status;
+		}
 
 		memcpy(KEY, "1234123412341234123412341234123", 32);
 		memcpy(IV, "1234123412341234123412341234123", 16);
 
-		DbgPrint("[PassThrough] DriverEntry: %s\n");
-		DbgPrint("[PassThrough] Key %s IV %s\n", KEY, IV);
+
+		//HANDLE file;
+		//DWORD m;
+		//char buffer[128];
+		//file = CreateFileA("%USERPROFILE%\ptsettings.pts", GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+		//ReadFile(file, buffer, sizeof(char), &m, NULL);
+		//DbgPrint("[PassThrough] path: %s", buffer);
 
 
-		if (!NT_SUCCESS(status)) {
+		//FILE file;
+		//errno_t error;
+		//error = fopen_s(&file, "%USERPROFILE%\ptsettings.pts", "r");
+		//if (error == 0)
+		//{
+		//	DbgPrint("[PassThrough] path: %s", &file);
+		//	/*char buffer[128];
+		//	fread(buffer, sizeof(char), 128, &file);
+		//	struct AES_ctx ctx;
+		//	AES_init_ctx_iv(&ctx, "f800c4ed995194cb345c86f49e49b965e024670f623ca765e7ef95a2c19e6f27", "5d25d31af94a172607a171b14368ffa1");
+		//	AES_CBC_encrypt_buffer(&ctx, buffer, 128);*/
+		//}
+		//if (&file)
+		//{
+		//	fclose(&file);
+		//}
 
-			FltUnregisterFilter(gFilterHandle);
+		// Создание сервера
+		PSECURITY_DESCRIPTOR  securityDescriptor;
+		OBJECT_ATTRIBUTES attr;
+		UNICODE_STRING portName;
+
+		NTSTATUS portsStatus = FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
+
+		if (NT_SUCCESS(portsStatus))
+		{
+			DbgPrint("[PassThrough] Ports success\n");
+
+			RtlInitUnicodeString(&portName, L"passThrough");
+			DbgPrint("[PassThrough] Port name: %ws\n", &portName);
+
+			InitializeObjectAttributes(&attr, &portName, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, &securityDescriptor);
+
+			NTSTATUS serverStatus = FltCreateCommunicationPort(gFilterHandle, &ServerPort, &attr, NULL, ClientConnect, ClientDisconnect, NULL, 1);
+			//NTSTATUS serverStatus = FltCreateCommunicationPort(gFilterHandle, &ServerPort, &attr, NULL, ClientConnect, ClientDisconnect, ClientMessage, 1);
+
+			FltFreeSecurityDescriptor(securityDescriptor);
+
+			if (!NT_SUCCESS(serverStatus))
+			{
+				DbgPrint("[PassThrough] Server ERROR\n");
+			}
 		}
+		/*else
+		{
+			DbgPrint("[PassThrough] Port %s, %d\n", ServerPort, ServerPort);
+		}*/
+
 	}
 
 	return status;
+}
+
+NTSTATUS
+ClientConnect(
+	_In_ PFLT_PORT clientPort,
+	_In_ PVOID ServerPortCookie,
+	_In_reads_bytes_(SizeOfContext) PVOID ConnectionContext,
+	_In_ ULONG SizeOfContext,
+	_Flt_ConnectionCookie_Outptr_ PVOID* ConnectionCookie
+)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(ServerPortCookie);
+	UNREFERENCED_PARAMETER(ConnectionContext);
+	UNREFERENCED_PARAMETER(SizeOfContext);
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+
+	FLT_ASSERT(ClientPort == NULL);
+	ClientPort = clientPort;
+	return STATUS_SUCCESS;
+}
+
+
+VOID
+ClientDisconnect(_In_opt_ PVOID ConnectionCookie)
+{
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+
+	FltCloseClientPort(gFilterHandle, &ClientPort);
+}
+
+NTSTATUS
+ClientMessage(
+	_In_ PVOID ConnectionCookie,
+	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
+	_In_ ULONG InputBufferSize,
+	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
+	_In_ ULONG OutputBufferSize,
+	_Out_ PULONG ReturnOutputBufferLength
+)
+{
+	//MINISPY_COMMAND command;
+	NTSTATUS status;
+
+	PAGED_CODE();
+
+	UNREFERENCED_PARAMETER(ConnectionCookie);
+
+	//
+	//                      **** PLEASE READ ****
+	//
+	//  The INPUT and OUTPUT buffers are raw user mode addresses.  The filter
+	//  manager has already done a ProbedForRead (on InputBuffer) and
+	//  ProbedForWrite (on OutputBuffer) which guarentees they are valid
+	//  addresses based on the access (user mode vs. kernel mode).  The
+	//  minifilter does not need to do their own probe.
+	//
+	//  The filter manager is NOT doing any alignment checking on the pointers.
+	//  The minifilter must do this themselves if they care (see below).
+	//
+	//  The minifilter MUST continue to use a try/except around any access to
+	//  these buffers.
+	//
+
+//	if ((InputBuffer != NULL) &&
+//		(InputBufferSize >= (FIELD_OFFSET(COMMAND_MESSAGE, Command) +
+//			sizeof(MINISPY_COMMAND)))) {
+//
+//		try {
+//
+//			//
+//			//  Probe and capture input message: the message is raw user mode
+//			//  buffer, so need to protect with exception handler
+//			//
+//
+//			command = ((PCOMMAND_MESSAGE)InputBuffer)->Command;
+//
+//		} except(SpyExceptionFilter(GetExceptionInformation(), TRUE)) {
+//
+//			return GetExceptionCode();
+//		}
+//
+//		switch (command) {
+//
+//		case GetMiniSpyLog:
+//
+//			//
+//			//  Return as many log records as can fit into the OutputBuffer
+//			//
+//
+//			if ((OutputBuffer == NULL) || (OutputBufferSize == 0)) {
+//
+//				status = STATUS_INVALID_PARAMETER;
+//				break;
+//			}
+//
+//			//
+//			//  We want to validate that the given buffer is POINTER
+//			//  aligned.  But if this is a 64bit system and we want to
+//			//  support 32bit applications we need to be careful with how
+//			//  we do the check.  Note that the way SpyGetLog is written
+//			//  it actually does not care about alignment but we are
+//			//  demonstrating how to do this type of check.
+//			//
+//
+//#if defined(_WIN64)
+//
+//			if (IoIs32bitProcess(NULL)) {
+//
+//				//
+//				//  Validate alignment for the 32bit process on a 64bit
+//				//  system
+//				//
+//
+//				if (!IS_ALIGNED(OutputBuffer, sizeof(ULONG))) {
+//
+//					status = STATUS_DATATYPE_MISALIGNMENT;
+//					break;
+//				}
+//
+//			}
+//			else {
+//
+//#endif
+//
+//				if (!IS_ALIGNED(OutputBuffer, sizeof(PVOID))) {
+//
+//					status = STATUS_DATATYPE_MISALIGNMENT;
+//					break;
+//				}
+//
+//#if defined(_WIN64)
+//
+//			}
+//
+//#endif
+//
+//			//
+//			//  Get the log record.
+//			//
+//
+//			status = SpyGetLog(OutputBuffer,
+//				OutputBufferSize,
+//				ReturnOutputBufferLength);
+//			break;
+//
+//
+//		case GetMiniSpyVersion:
+//
+//			//
+//			//  Return version of the MiniSpy filter driver.  Verify
+//			//  we have a valid user buffer including valid
+//			//  alignment
+//			//
+//
+//			if ((OutputBufferSize < sizeof(MINISPYVER)) ||
+//				(OutputBuffer == NULL)) {
+//
+//				status = STATUS_INVALID_PARAMETER;
+//				break;
+//			}
+//
+//			//
+//			//  Validate Buffer alignment.  If a minifilter cares about
+//			//  the alignment value of the buffer pointer they must do
+//			//  this check themselves.  Note that a try/except will not
+//			//  capture alignment faults.
+//			//
+//
+//			if (!IS_ALIGNED(OutputBuffer, sizeof(ULONG))) {
+//
+//				status = STATUS_DATATYPE_MISALIGNMENT;
+//				break;
+//			}
+//
+//			//
+//			//  Protect access to raw user-mode output buffer with an
+//			//  exception handler
+//			//
+//
+//			try {
+//
+//				((PMINISPYVER)OutputBuffer)->Major = MINISPY_MAJ_VERSION;
+//				((PMINISPYVER)OutputBuffer)->Minor = MINISPY_MIN_VERSION;
+//
+//			} except(SpyExceptionFilter(GetExceptionInformation(), TRUE)) {
+//
+//				return GetExceptionCode();
+//			}
+//
+//			*ReturnOutputBufferLength = sizeof(MINISPYVER);
+//			status = STATUS_SUCCESS;
+//			break;
+//
+//		default:
+//			status = STATUS_INVALID_PARAMETER;
+//			break;
+//		}
+//
+//	}
+//	else {
+//
+	//status = STATUS_INVALID_PARAMETER;
+	//	}
+	//
+	//return status;
+
+
+	STRING FNameString;
+	DbgPrint(("[PassThrough] Content:%s | Size: %d\n", InputBuffer, InputBufferSize));
+
+	return STATUS_ABANDONED;
+
 }
 
 NTSTATUS
@@ -615,6 +912,8 @@ Return Value:
 
 	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
 		("PassThrough!PtUnload: Entered\n"));
+
+	FltCloseCommunicationPort(ServerPort);
 
 	FltUnregisterFilter(gFilterHandle);
 
