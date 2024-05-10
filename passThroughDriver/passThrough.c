@@ -25,6 +25,8 @@ Environment:
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
+uint8_t* KEY[32];
+uint8_t* IV[16];
 
 PFLT_FILTER gFilterHandle;
 ULONG_PTR OperationStatusCtx = 1;
@@ -550,9 +552,6 @@ Return Value:
 
 	UNREFERENCED_PARAMETER(RegistryPath);
 
-	PT_DBG_PRINT(PTDBG_TRACE_ROUTINES,
-		("PassThrough!DriverEntry: Entered\n"));
-
 	//
 	//  Register with FltMgr to tell it our callback routines
 	//
@@ -570,6 +569,13 @@ Return Value:
 		//
 
 		status = FltStartFiltering(gFilterHandle);
+
+		memcpy(KEY, "1234123412341234123412341234123", 32);
+		memcpy(IV, "1234123412341234123412341234123", 16);
+
+		DbgPrint("[PassThrough] DriverEntry: %s\n");
+		DbgPrint("[PassThrough] Key %s IV %s\n", KEY, IV);
+
 
 		if (!NT_SUCCESS(status)) {
 
@@ -615,8 +621,6 @@ Return Value:
 	return STATUS_SUCCESS;
 }
 
-void encrypt(unsigned char* buffer, unsigned int bufferLen);
-void decrypt(unsigned char* buffer, unsigned int bufferLen);
 
 /*************************************************************************
 	MiniFilter callback routines.
@@ -670,33 +674,32 @@ Return Value:
 		if (RtlEqualUnicodeString(&required_extension, &NameInfo->Extension, FALSE) == TRUE) {
 
 			if (Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
-				DbgPrint("[PassThrough] Writting to file: %wZ | %wZ\n", NameInfo->Name, NameInfo->Extension);
-				// Encrypting is gonna be here
 				if (Data->Iopb->Parameters.Write.WriteBuffer) {
-					/*unsigned char buffer[128];
-					memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
-					DbgPrint("[PassThrough] InBuffer: %s\n", buffer);
-					encrypt(buffer, 128);
-					memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);*/
+					try
+					{
+						DbgPrint("[PassThrough] InBuffer: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
 
-					DbgPrint("[PassThrough] InBuffer: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
+						// Key and IV for AES
+						uint8_t buffer[128];
 
-					// Key and IV for AES
-					uint8_t *key[32] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-					uint8_t* iv[16] = { 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c };
+						memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
 
-					uint8_t buffer[128];
+						// Initializing AES
+						struct AES_ctx ctx;
 
-					memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
+						AES_init_ctx_iv(&ctx, KEY, IV);
+						AES_CBC_encrypt_buffer(&ctx, buffer, 128);
 
-					// Initializing AES
-					struct AES_ctx ctx;
-					AES_init_ctx_iv(&ctx, key, iv);
-					AES_CBC_encrypt_buffer(&ctx, buffer, 128);
+						memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);
 
-					memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);
+						DbgPrint("[PassThrough] OutBuffer: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
 
-					DbgPrint("[PassThrough] OutBuffer: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
+						leave;
+					}
+					finally
+					{
+
+					}
 				}
 				else {
 					DbgPrint("[PassThrough] InBuffer is empty or null\n");
@@ -736,8 +739,6 @@ Return Value:
 
 	return FLT_PREOP_SUCCESS_WITH_CALLBACK;
 }
-
-
 
 VOID
 PtOperationStatusCallback(
@@ -792,44 +793,6 @@ Return Value:
 			ParameterSnapshot->MinorFunction,
 			FltGetIrpName(ParameterSnapshot->MajorFunction)));
 }
-
-void encrypt(unsigned char* buffer, unsigned int bufferLen) {
-	unsigned char t;
-
-	for (unsigned int i = 0; i < (bufferLen - 1) / 2; i++) {
-		DbgPrint("[PassThrough] encrypt %c, %c\n", buffer[i], buffer[bufferLen - i - 2]);
-		t = buffer[i];
-		buffer[i] = buffer[bufferLen - i - 2];
-		buffer[bufferLen - i - 2] = buffer[i];
-	}
-}
-
-void decrypt(unsigned char* buffer, unsigned int bufferLen) {
-	//unsigned char t;
-
-	unsigned char encrypted[128];
-
-	memcpy(encrypted, buffer, 127);
-
-
-	for (unsigned int i = 0; i < (bufferLen - 1); i++) {
-		encrypted[bufferLen - i - 2] = buffer[i];
-	}
-
-	for (unsigned int i = 0; i < bufferLen; i++) {
-		DbgPrint("[PassThrough] decrypt: {%d} %c -> %c\n", i, buffer[i], encrypted[i]);
-	}
-
-	memcpy(buffer, encrypted, 127);
-
-	/*for (unsigned int i = 0; i < (bufferLen - 1) / 2; i++) {
-		DbgPrint("[PassThrough] decrypt %c, %c\n", buffer[i], buffer[bufferLen - i - 2]);
-		t = buffer[i];
-		buffer[i] = buffer[bufferLen - i - 2];
-		buffer[bufferLen - i - 2] = buffer[i];
-	}*/
-}
-
 
 FLT_POSTOP_CALLBACK_STATUS
 PtPostOperationPassThrough(
@@ -887,26 +850,28 @@ Return Value:
 				DbgPrint("[PassThrough] Reading file: %wZ | %wZ\n", NameInfo->Name, NameInfo->Extension);
 				// Decrypting is gonna be here
 				if (Data->Iopb->Parameters.Read.ReadBuffer) {
-					//unsigned char buffer[128];
-					//memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
-					DbgPrint("[PassThrough] InBuffer: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
-					
-					// Key and IV for AES
-					uint8_t* key[32] = { 0x0, 0x1, 0x2, 0x3, 0x4, 0x5, 0x6, 0x7, 0x8, 0x9, 0xa, 0xb, 0xc, 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f };
-					uint8_t* iv[16] = { 0xd, 0xe, 0xf, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b, 0x1c };
+					try
+					{
+						DbgPrint("[PassThrough] InBuffer: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
 
-					uint8_t buffer[128];
+						// Создание и заполнение буфера
+						uint8_t buffer[128];
+						memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
 
-					memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
+						// Инициализация контекста для шифрования
+						struct AES_ctx ctx;
+						AES_init_ctx_iv(&ctx, KEY, IV);
+						AES_CBC_decrypt_buffer(&ctx, buffer, 128);
 
-					//Initializin AES
-					struct AES_ctx ctx;
-					AES_init_ctx_iv(&ctx, key, iv);
-					AES_CBC_decrypt_buffer(&ctx, buffer, 128);
+						memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 128);
 
-					memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 128);
+						DbgPrint("[PassThrough] OutBuffer (Data->Iopb...): %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
 
-					DbgPrint("[PassThrough] OutBuffer (Data->Iopb...): %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
+						leave;
+					}
+					finally
+					{
+					}
 				}
 				else {
 					DbgPrint("[PassThrough] InBuffer is empty or null\n");
