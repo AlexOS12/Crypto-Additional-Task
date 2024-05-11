@@ -15,6 +15,7 @@
 
 #include "PTSettings.h"
 #include "encryptor.h"
+#include "filterconnector.h"
 
 QT_BEGIN_NAMESPACE
 namespace Ui {
@@ -45,6 +46,7 @@ private slots:
 private:
     BOOL adminRights = FALSE;
     QString settingsFilePath;
+    FilterConnector flt;
 
     void closeEvent(QCloseEvent *event);
 

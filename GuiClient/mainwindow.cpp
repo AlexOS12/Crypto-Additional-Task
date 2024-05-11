@@ -9,10 +9,11 @@ MainWindow::MainWindow(QWidget *parent)
 
     adminRights = IsAppRunningAsAdminMode();
 
+
     createActions();
     createTrayIcon();
 
-    if (adminRights) {
+    if (adminRights || 1) {
         setWindowTitle("[ADMIN] PassThrough Settings");
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
@@ -31,12 +32,19 @@ MainWindow::MainWindow(QWidget *parent)
 
     trayIcon->show();
 
+    if (!flt.testDLL()) {
+        qDebug() << "Не удалось подключить FLTConnector.dll :(";
+        this->showNotification("Ошибка!", "Не удалось загрузить DLL");
+    }
+
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
     if (ReadSettings()) {
         ui->KeyLineEdit->setText(this->current.key);
         ui->ExtensionEdit->setText(this->current.extension);
     }
+
+
 }
 
 MainWindow::~MainWindow()
@@ -107,9 +115,18 @@ bool MainWindow::ReloadDriver()
 
 bool MainWindow::LoadDriver()
 {
-    qDebug() << "Imagine driver is loading...";
-    showNotification("Driver Loading", "Imagine driver is loading...");
-    return true;
+    int res = this->flt.loadDriver(L"PassThrough");
+    if (res == 0) {
+        this->ui->RedButton->setText("Драйвер успешно запущен!");
+        return true;
+    } else {
+        this->ui->RedButton->setText(QString::number(res));
+        return false;
+    }
+
+    // qDebug() << "Imagine driver is loading...";
+    // showNotification("Driver Loading", "Imagine driver is loading...");
+    // return true;
 }
 
 bool MainWindow::UnloadDriver()
