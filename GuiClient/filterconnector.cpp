@@ -19,8 +19,8 @@ bool FilterConnector::testDLL()
         if (testRes == 15) {
             return true;
         }
+    }
     return false;
-}
 }
 
 int FilterConnector::loadDriver(LPCWSTR driverName)
@@ -31,6 +31,19 @@ int FilterConnector::loadDriver(LPCWSTR driverName)
 
     if (loadDriver) {
         return loadDriver(driverName);
+    } else {
+        return -1;
+    }
+}
+
+int FilterConnector::unloadDriver(LPCWSTR driverName)
+{
+    typedef int (*unloadDriverFunction)(LPCWSTR);
+
+    unloadDriverFunction unloadDriver = (unloadDriverFunction) lib.resolve("unloadDriver");
+
+    if (unloadDriver) {
+        return unloadDriver(driverName);
     } else {
         return -1;
     }

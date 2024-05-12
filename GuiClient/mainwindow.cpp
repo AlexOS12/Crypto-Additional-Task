@@ -13,7 +13,7 @@ MainWindow::MainWindow(QWidget *parent)
     createActions();
     createTrayIcon();
 
-    if (adminRights || 1) {
+    if (adminRights) {
         setWindowTitle("[ADMIN] PassThrough Settings");
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
@@ -117,23 +117,29 @@ bool MainWindow::LoadDriver()
 {
     int res = this->flt.loadDriver(L"PassThrough");
     if (res == 0) {
-        this->ui->RedButton->setText("Драйвер успешно запущен!");
+        // this->ui->RedButton->setText("Драйвер успешно запущен!");
+        this->showNotification("Драйвер успешно загружен", "Драйвер был успешно запущен!");
+        this->filterLoaded = true;
         return true;
     } else {
-        this->ui->RedButton->setText(QString::number(res));
+        // this->ui->RedButton->setText(QString::number(res));
+        this->filterLoaded = false;
         return false;
     }
-
-    // qDebug() << "Imagine driver is loading...";
-    // showNotification("Driver Loading", "Imagine driver is loading...");
-    // return true;
 }
 
 bool MainWindow::UnloadDriver()
 {
-    qDebug() << "Imagine driver is unloading...";
-    showNotification("Driver Unloading", "Imagine driver is unloading...");
-    return true;
+    int res = this->flt.unloadDriver(L"PassThrough");
+
+    if (res == 0) {
+        this->showNotification("Драйвер успешно выгружен", "Драйвер был успешно выгружен!");
+        this->filterLoaded = false;
+        return true;
+    } else {
+        this->filterLoaded = true;
+        return false;
+    }
 }
 
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
@@ -268,7 +274,13 @@ void MainWindow::reloadDriverSlot()
 
 void MainWindow::on_RedButton_clicked()
 {
-    LoadDriver();
+    if (!this->filterLoaded) {
+        if (LoadDriver())
+            this->ui->RedButton->setText("Выключить драйвер");
+    } else {
+        if (UnloadDriver())
+            this->ui->RedButton->setText("Включить драйвер");
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)

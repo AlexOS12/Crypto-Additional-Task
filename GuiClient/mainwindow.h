@@ -44,6 +44,7 @@ private slots:
 
     void on_RedButton_clicked();
 private:
+    bool filterLoaded = false;
     BOOL adminRights = FALSE;
     QString settingsFilePath;
     FilterConnector flt;

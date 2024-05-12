@@ -19,6 +19,7 @@ public:
     bool testDLL();
 
     int loadDriver(LPCWSTR driverName);
+    int unloadDriver(LPCWSTR driverName);
 };
 
 #endif // FILTERCONNECTOR_H
