@@ -18,4 +18,6 @@ extern "C" {
 	FLTCONNECTOR_API int adjustPrivileges();
 	FLTCONNECTOR_API int loadDriver(LPCWSTR driverName);
 	FLTCONNECTOR_API int unloadDriver(LPCWSTR driverName);
+	FLTCONNECTOR_API int connectToDriver(LPCWSTR portName, HANDLE *hPort);
+	FLTCONNECTOR_API int sendMessage(HANDLE hPort);
 }

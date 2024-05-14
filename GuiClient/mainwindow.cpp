@@ -44,6 +44,8 @@ MainWindow::MainWindow(QWidget *parent)
         }
     }
 
+
+
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
     if (ReadSettings()) {
@@ -125,6 +127,15 @@ bool MainWindow::LoadDriver()
     int res = this->flt.loadDriver(L"PassThrough");
     if (res == 0) {
         // this->ui->RedButton->setText("Драйвер успешно запущен!");
+        HRESULT res = this->flt.connectToDriver(L"\\PassThrough");
+        if (res != S_OK) {
+            this->showNotification("Не удалось подключиться к драйверу", QString::number(res));
+            return false;
+        }
+        if (flt.sendMessageToDriver(L"\\PassThrough") != 0) {
+            this->showNotification("Не удалось отправить сообщение", "");
+            return false;
+        }
         this->showNotification("Драйвер успешно загружен", "Драйвер был успешно запущен!");
         this->filterLoaded = true;
         return true;

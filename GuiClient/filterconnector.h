@@ -15,12 +15,14 @@ public:
 
     // QLibrary lib = QLibrary(":/dll/FilterConnector.dll");
     QLibrary lib;
-
+    HANDLE hPort;
     bool testDLL();
 
     int adjustPrivileges();
     int loadDriver(LPCWSTR driverName);
     int unloadDriver(LPCWSTR driverName);
+    HRESULT connectToDriver(LPCWSTR portName);
+    int sendMessageToDriver(LPCWSTR portName);
 };
 
 #endif // FILTERCONNECTOR_H

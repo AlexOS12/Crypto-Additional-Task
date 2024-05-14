@@ -62,3 +62,35 @@ int FilterConnector::unloadDriver(LPCWSTR driverName)
         return -1;
     }
 }
+
+HRESULT FilterConnector::connectToDriver(LPCWSTR portName)
+{
+    typedef HRESULT (*connectToDriverFunction)(LPCWSTR, HANDLE*);
+
+    connectToDriverFunction connectToDriver = (connectToDriverFunction) lib.resolve("connectToDriver");
+
+    if (connectToDriver) {
+        HRESULT res = connectToDriver(portName, &this->hPort);
+        // if (this->hPort != NULL) {
+        //     return true;
+        // }
+
+        if (res == S_OK) {
+            return S_OK;
+        } else {
+            return res;
+        }
+    }
+
+}
+
+int FilterConnector::sendMessageToDriver(LPCWSTR portName)
+{
+    typedef int (*sendMessageToDriverFunction)(HANDLE);
+
+    sendMessageToDriverFunction sendMessageToDriver = (sendMessageToDriverFunction) lib.resolve("sendMessage");
+
+    if (sendMessageToDriver) {
+        return sendMessageToDriver(this->hPort);
+    }
+}

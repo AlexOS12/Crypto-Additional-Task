@@ -102,3 +102,27 @@ int unloadDriver(LPCWSTR driverName) {
 
 	return 4;
 }
+
+int connectToDriver(LPCWSTR portName, HANDLE *hPort) {
+	HRESULT res = FilterConnectCommunicationPort(portName, 0, NULL, 0, NULL, hPort);
+	
+	if (res == S_OK) {
+		return 0;
+	}
+	else {
+		return -1;
+	}
+}
+
+int sendMessage(HANDLE hPort) {
+	char buffer[48] = "aboba";
+	char retBuffer[48] = { 0 };
+	DWORD retLen = 0;
+	HRESULT res = FilterSendMessage(hPort, buffer, 48, retBuffer, 48, &retLen);
+
+	if (res == S_OK) {
+		return 0;
+	} else {
+		return -1;
+	}
+}
