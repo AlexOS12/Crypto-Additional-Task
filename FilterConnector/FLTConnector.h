@@ -15,6 +15,7 @@ extern "C" {
 	// 2 - Не удалось изменить токен
 	// 3 - Во время изменения привелегий произошла ошибка
 	// 4 - Не удалось загрузить драйвер
+	FLTCONNECTOR_API int adjustPrivileges();
 	FLTCONNECTOR_API int loadDriver(LPCWSTR driverName);
 	FLTCONNECTOR_API int unloadDriver(LPCWSTR driverName);
 }

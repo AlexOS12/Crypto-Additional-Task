@@ -23,6 +23,20 @@ bool FilterConnector::testDLL()
     return false;
 }
 
+int FilterConnector::adjustPrivileges()
+{
+    typedef int (*adjustPrivilegesFunction)();
+
+    adjustPrivilegesFunction adjustPrivileges = (adjustPrivilegesFunction) lib.resolve("adjustPrivileges");
+
+    if (adjustPrivileges) {
+        return adjustPrivileges();
+    } else {
+        return -1;
+    }
+
+}
+
 int FilterConnector::loadDriver(LPCWSTR driverName)
 {
     typedef int (*loadDriverFunction)(LPCWSTR);

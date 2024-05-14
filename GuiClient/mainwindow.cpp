@@ -37,6 +37,13 @@ MainWindow::MainWindow(QWidget *parent)
         this->showNotification("Ошибка!", "Не удалось загрузить DLL");
     }
 
+    if (this->adminRights) {
+        int res = flt.adjustPrivileges();
+        if (res != 0) {
+            this->showNotification("Не удалось получить права", "Не удалось получить права на управление драйвером. Попробуйте перезапустить приложение. Код ошибки: " + QString::number(res));
+        }
+    }
+
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
     if (ReadSettings()) {

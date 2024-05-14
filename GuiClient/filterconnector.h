@@ -18,6 +18,7 @@ public:
 
     bool testDLL();
 
+    int adjustPrivileges();
     int loadDriver(LPCWSTR driverName);
     int unloadDriver(LPCWSTR driverName);
 };
