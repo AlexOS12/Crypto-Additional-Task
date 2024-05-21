@@ -22,22 +22,44 @@ Environment:
 #include <dontuse.h>
 #include <suppress.h>
 #include "aes.h"
-#include <stdio.h>
-//#include <fileapi.h>
+#include <ntstrsafe.h>
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
+typedef struct _DriverData {
+	UNICODE_STRING requiredExtension;
+	struct AES_ctx ctx;
+} DriverData, * PDriverData;
+
+struct ClientData {
+	char key[33];
+	wchar_t ext[32];
+};
 
 PFLT_FILTER gFilterHandle;
 PFLT_PORT ServerPort = NULL;
 PFLT_PORT ClientPort = NULL;
 
-uint8_t* KEY[32];
-uint8_t* IV[16];
+PDRIVER_OBJECT gDriverObject;
+
+CONST UNICODE_STRING EMPTY = RTL_CONSTANT_STRING(L"");
+
+//UNICODE_STRING inputExt;
+PDriverData PrivateData;
+
+//
+//typedef struct _HIDDEN_DATA {
+//	UNICODE_STRING    HFile;
+//} HIDDEN_DATA, * PHIDDEN_DATA;
+//PHIDDEN_DATA gHiddenData;
+//
 
 /*************************************************************************
 	Prototypes
 *************************************************************************/
+#pragma region prototypes
+
+
 NTSTATUS
 ClientConnect(
 	_In_ PFLT_PORT ClientPort,
@@ -52,15 +74,14 @@ ClientDisconnect(
 	_In_opt_ PVOID ConnectionCookie
 );
 
-//NTSTATUS
-//ClientMessage(
-//	_In_ PVOID ConnectionCookie,
-//	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
-//	_In_ ULONG InputBufferSize,
-//	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
-//	_In_ ULONG OutputBufferSize,
-//	_Out_ PULONG ReturnOutputBufferLength
-//);
+NTSTATUS
+ClientMessage(IN PVOID ConnectionCookie,
+	IN PVOID InputBuffer  OPTIONAL,
+	IN ULONG InputBufferSize,
+	OUT PVOID OutputBuffer OPTIONAL,
+	IN ULONG OutputBufferSize,
+	OUT PULONG ReturnOutputBufferLength);
+
 
 DRIVER_INITIALIZE DriverEntry;
 NTSTATUS
@@ -96,6 +117,7 @@ PtPostOperationPassThrough(
 	_In_opt_ PVOID CompletionContext,
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
+#pragma endregion
 
 //
 //  operation registration
@@ -138,7 +160,6 @@ CONST FLT_REGISTRATION FilterRegistration = {
 	NULL                                //  NormalizeNameComponent
 
 };
-
 /*************************************************************************
 	MiniFilter initialization and unload routines.
 *************************************************************************/
@@ -168,8 +189,20 @@ Return Value:
 
 --*/
 {
-	NTSTATUS status;
+	//gHiddenData = ExAllocatePoolWithTag(NonPagedPool, sizeof(DriverData), 'reqE');
+	PrivateData = ExAllocatePoolWithTag(NonPagedPool, sizeof(DriverData), 'reqE');
+	RtlInitUnicodeString(&PrivateData->requiredExtension, L"");
+	DbgPrint("[PassThrough] init p: %p \n", PrivateData);
+	DbgPrint("[PassThrough] init size: %d \n", sizeof(PrivateData));
+	DbgPrint("[PassThrough] init length: %u \n", PrivateData->requiredExtension.Length);
+	DbgPrint("[PassThrough] init ext: %wZ \n", PrivateData->requiredExtension);
+	DbgPrint("[PassThrough] init ext p: %p \n", &PrivateData->requiredExtension);
+	DbgPrint("[PassThrough] init ctx: %p \n", &PrivateData->ctx);
 
+
+
+	NTSTATUS status;
+	gDriverObject = DriverObject;
 	status = FltRegisterFilter(DriverObject,
 		&FilterRegistration,
 		&gFilterHandle);
@@ -181,13 +214,9 @@ Return Value:
 	}
 	DbgPrint("[PassThrough] FltRegisterFilter\n");
 
-	memcpy(KEY, "1234123412341234123412341234123", 32);
-	memcpy(IV, "1234123412341234123412341234123", 16);
-
-	// Создание сервера
 	PSECURITY_DESCRIPTOR  securityDescriptor;
 	OBJECT_ATTRIBUTES attr = { 0 };
-	UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\pt");
+	UNICODE_STRING portName = RTL_CONSTANT_STRING(L"\\PassThrough");
 
 	status = FltBuildDefaultSecurityDescriptor(&securityDescriptor, FLT_PORT_ALL_ACCESS);
 
@@ -196,7 +225,7 @@ Return Value:
 		DbgPrint("[PassThrough] SecurityDescriptor success\n");
 		InitializeObjectAttributes(&attr, &portName, OBJ_KERNEL_HANDLE | OBJ_CASE_INSENSITIVE, NULL, securityDescriptor);
 
-		status = FltCreateCommunicationPort(gFilterHandle, &ServerPort, &attr, NULL, ClientConnect, ClientDisconnect, NULL, 1);
+		status = FltCreateCommunicationPort(gFilterHandle, &ServerPort, &attr, NULL, ClientConnect, ClientDisconnect, ClientMessage, 1);
 
 		FltFreeSecurityDescriptor(securityDescriptor);
 
@@ -211,6 +240,7 @@ Return Value:
 				DbgPrint("[PassThrough] Filter start success\n");
 				return status;
 			}
+			ExFreePoolWithTag(PrivateData, 'reqE');
 			DbgPrint("[PassThrough] Filter start error\n");
 			FltCloseCommunicationPort(ServerPort);
 		}
@@ -230,204 +260,76 @@ NTSTATUS ClientConnect(
 	_Flt_ConnectionCookie_Outptr_ PVOID* ConnectionCookie
 )
 {
+	DbgPrint("[PassThrough] Connection");
+
 	ClientPort = clientPort;
+	DbgPrint("[PassThrough] Port: %d", ClientPort);
+
 	return STATUS_SUCCESS;
 }
 
 
 VOID ClientDisconnect(PVOID ConnectionCookie)
 {
+	DbgPrint("[PassThrough] Disconnect");
 	FltCloseClientPort(gFilterHandle, &ClientPort);
 }
 
-//NTSTATUS
-//ClientMessage(
-//	_In_ PVOID ConnectionCookie,
-//	_In_reads_bytes_opt_(InputBufferSize) PVOID InputBuffer,
-//	_In_ ULONG InputBufferSize,
-//	_Out_writes_bytes_to_opt_(OutputBufferSize, *ReturnOutputBufferLength) PVOID OutputBuffer,
-//	_In_ ULONG OutputBufferSize,
-//	_Out_ PULONG ReturnOutputBufferLength
-//)
-//{
-//	//MINISPY_COMMAND command;
-//	NTSTATUS status;
-//
-//	PAGED_CODE();
-//
-//	UNREFERENCED_PARAMETER(ConnectionCookie);
-//
-//	//
-//	//                      **** PLEASE READ ****
-//	//
-//	//  The INPUT and OUTPUT buffers are raw user mode addresses.  The filter
-//	//  manager has already done a ProbedForRead (on InputBuffer) and
-//	//  ProbedForWrite (on OutputBuffer) which guarentees they are valid
-//	//  addresses based on the access (user mode vs. kernel mode).  The
-//	//  minifilter does not need to do their own probe.
-//	//
-//	//  The filter manager is NOT doing any alignment checking on the pointers.
-//	//  The minifilter must do this themselves if they care (see below).
-//	//
-//	//  The minifilter MUST continue to use a try/except around any access to
-//	//  these buffers.
-//	//
-//
-////	if ((InputBuffer != NULL) &&
-////		(InputBufferSize >= (FIELD_OFFSET(COMMAND_MESSAGE, Command) +
-////			sizeof(MINISPY_COMMAND)))) {
-////
-////		try {
-////
-////			//
-////			//  Probe and capture input message: the message is raw user mode
-////			//  buffer, so need to protect with exception handler
-////			//
-////
-////			command = ((PCOMMAND_MESSAGE)InputBuffer)->Command;
-////
-////		} except(SpyExceptionFilter(GetExceptionInformation(), TRUE)) {
-////
-////			return GetExceptionCode();
-////		}
-////
-////		switch (command) {
-////
-////		case GetMiniSpyLog:
-////
-////			//
-////			//  Return as many log records as can fit into the OutputBuffer
-////			//
-////
-////			if ((OutputBuffer == NULL) || (OutputBufferSize == 0)) {
-////
-////				status = STATUS_INVALID_PARAMETER;
-////				break;
-////			}
-////
-////			//
-////			//  We want to validate that the given buffer is POINTER
-////			//  aligned.  But if this is a 64bit system and we want to
-////			//  support 32bit applications we need to be careful with how
-////			//  we do the check.  Note that the way SpyGetLog is written
-////			//  it actually does not care about alignment but we are
-////			//  demonstrating how to do this type of check.
-////			//
-////
-////#if defined(_WIN64)
-////
-////			if (IoIs32bitProcess(NULL)) {
-////
-////				//
-////				//  Validate alignment for the 32bit process on a 64bit
-////				//  system
-////				//
-////
-////				if (!IS_ALIGNED(OutputBuffer, sizeof(ULONG))) {
-////
-////					status = STATUS_DATATYPE_MISALIGNMENT;
-////					break;
-////				}
-////
-////			}
-////			else {
-////
-////#endif
-////
-////				if (!IS_ALIGNED(OutputBuffer, sizeof(PVOID))) {
-////
-////					status = STATUS_DATATYPE_MISALIGNMENT;
-////					break;
-////				}
-////
-////#if defined(_WIN64)
-////
-////			}
-////
-////#endif
-////
-////			//
-////			//  Get the log record.
-////			//
-////
-////			status = SpyGetLog(OutputBuffer,
-////				OutputBufferSize,
-////				ReturnOutputBufferLength);
-////			break;
-////
-////
-////		case GetMiniSpyVersion:
-////
-////			//
-////			//  Return version of the MiniSpy filter driver.  Verify
-////			//  we have a valid user buffer including valid
-////			//  alignment
-////			//
-////
-////			if ((OutputBufferSize < sizeof(MINISPYVER)) ||
-////				(OutputBuffer == NULL)) {
-////
-////				status = STATUS_INVALID_PARAMETER;
-////				break;
-////			}
-////
-////			//
-////			//  Validate Buffer alignment.  If a minifilter cares about
-////			//  the alignment value of the buffer pointer they must do
-////			//  this check themselves.  Note that a try/except will not
-////			//  capture alignment faults.
-////			//
-////
-////			if (!IS_ALIGNED(OutputBuffer, sizeof(ULONG))) {
-////
-////				status = STATUS_DATATYPE_MISALIGNMENT;
-////				break;
-////			}
-////
-////			//
-////			//  Protect access to raw user-mode output buffer with an
-////			//  exception handler
-////			//
-////
-////			try {
-////
-////				((PMINISPYVER)OutputBuffer)->Major = MINISPY_MAJ_VERSION;
-////				((PMINISPYVER)OutputBuffer)->Minor = MINISPY_MIN_VERSION;
-////
-////			} except(SpyExceptionFilter(GetExceptionInformation(), TRUE)) {
-////
-////				return GetExceptionCode();
-////			}
-////
-////			*ReturnOutputBufferLength = sizeof(MINISPYVER);
-////			status = STATUS_SUCCESS;
-////			break;
-////
-////		default:
-////			status = STATUS_INVALID_PARAMETER;
-////			break;
-////		}
-////
-////	}
-////	else {
-////
-//	//status = STATUS_INVALID_PARAMETER;
-//	//	}
-//	//
-//	//return status;
-//
-//
-//	STRING FNameString;
-//	DbgPrint(("[PassThrough] Content:%s | Size: %d\n", InputBuffer, InputBufferSize));
-//
-//	return STATUS_ABANDONED;
-//
-//}
+NTSTATUS
+ClientMessage(IN PVOID ConnectionCookie,
+	IN PVOID InputBuffer  OPTIONAL,
+	IN ULONG InputBufferSize,
+	OUT PVOID OutputBuffer OPTIONAL,
+	IN ULONG OutputBufferSize,
+	OUT PULONG ReturnOutputBufferLength) {
+	DbgPrint("[PassThrough] Client message\n\r");
+	if (InputBuffer) {
+		DbgPrint("[PassThrough] Client length buffer: %d\n\r", InputBufferSize);
+
+		struct ClientData input;
+		memcpy(&input, InputBuffer, sizeof(struct ClientData));
+		//================================================
+		/*RtlInitUnicodeString(&inputExt, input.ext);
+
+		DbgPrint("[PassThrough] unicode maxlength: %u \n", inputExt.MaximumLength);
+		DbgPrint("[PassThrough] unicode length: %u \n", inputExt.Length);
+		DbgPrint("[PassThrough] unicode buffer: %wZ \n", &inputExt);*/
+		//================================================
+		//PrivateData->requiredExtension = inputExt;
+		RtlInitUnicodeString(&PrivateData->requiredExtension, input.ext);
+
+		DbgPrint("[PassThrough] private UNICODE maxlength: %u \n", PrivateData->requiredExtension.MaximumLength);
+		DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
+		DbgPrint("[PassThrough] private UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
+
+		//AES_init_ctx_iv(&ctx, input.key, input.key);
+
+		DbgPrint("[PassThrough] Client struct key: %s | extension: %ws\n", input.key, input.ext);
+
+		//==================TEST`S========================
+
+		UNICODE_STRING test;
+		RtlInitUnicodeString(&test, L"super");
+		int t = RtlEqualUnicodeString(&PrivateData->requiredExtension, &test, FALSE) == TRUE;
+			
+
+		/*RtlInitUnicodeString(&PrivateData->requiredExtension, L"test");
+
+		DbgPrint("[PassThrough] private UNICODE maxlength: %u \n", PrivateData->requiredExtension.MaximumLength);
+		DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
+		DbgPrint("[PassThrough] private UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
+
+		UNICODE_STRING test2;
+		RtlInitUnicodeString(&test2, L"test");
+		int t2 = RtlEqualUnicodeString(&PrivateData->requiredExtension, &test2, FALSE) == TRUE;
+		DbgPrint("[PassThrough] test: %d \n", t2);*/
+
+	}
+	return STATUS_SUCCESS;
+}
 
 NTSTATUS
-PtUnload(
-	_In_ FLT_FILTER_UNLOAD_FLAGS Flags
-)
+PtUnload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 /*++
 
 Routine Description:
@@ -447,9 +349,10 @@ Return Value:
 
 --*/
 {
-	DbgPrint("[PassThrough] Driver unload\n");
+	DbgPrint("[PassThrough] Driver unload\n\r");
 	FltCloseCommunicationPort(ServerPort);
 	FltUnregisterFilter(gFilterHandle);
+	ExFreePoolWithTag(PrivateData, 'reqE');
 	return STATUS_SUCCESS;
 }
 
@@ -500,42 +403,37 @@ Return Value:
 		FLT_FILE_NAME_NORMALIZED |
 		FLT_FILE_NAME_QUERY_DEFAULT,
 		&NameInfo);
-	UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");
-	if (NT_SUCCESS(status))
-	{
-		if (RtlEqualUnicodeString(&required_extension, &NameInfo->Extension, FALSE) == TRUE) {
+	//UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");
+	if (NT_SUCCESS(status)) {
+		if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &EMPTY, FALSE) != TRUE) {
+			DbgPrint("[PassThrough] storage: %p \n", PrivateData);
+			DbgPrint("[PassThrough] UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
+			DbgPrint("[PassThrough] ext p: %p \n", &PrivateData->requiredExtension);
+			DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
 
-			if (Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
-				if (Data->Iopb->Parameters.Write.WriteBuffer) {
-					try
-					{
-						DbgPrint("[PassThrough] Write. Input: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
+			if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &NameInfo->Extension, FALSE) == TRUE) {
+				DbgPrint("[PassThrough] WRITING\n");
+				DbgPrint("[PassThrough] UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
+				/*if (Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
+					if (Data->Iopb->Parameters.Write.WriteBuffer) {
+						try {
+							DbgPrint("[PassThrough] Write. Input: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
 
-						// Key and IV for AES
-						uint8_t buffer[128];
+							uint8_t buffer[128];
+							memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
 
-						memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
+							AES_CBC_encrypt_buffer(&ctx, buffer, 128);
 
-						// Initializing AES
-						struct AES_ctx ctx;
-
-						AES_init_ctx_iv(&ctx, KEY, IV);
-						AES_CBC_encrypt_buffer(&ctx, buffer, 128);
-
-						memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);
-
-						DbgPrint("[PassThrough] Write. Output: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
-
-						leave;
+							memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);
+							DbgPrint("[PassThrough] Write. Output: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
+						}
+						finally {
+						}
 					}
-					finally
-					{
-
+					else {
+						DbgPrint("[PassThrough] InBuffer is empty or null\n");
 					}
-				}
-				else {
-					DbgPrint("[PassThrough] InBuffer is empty or null\n");
-				}
+				}*/
 			}
 		}
 	}
@@ -585,40 +483,33 @@ Return Value:
 		FLT_FILE_NAME_NORMALIZED |
 		FLT_FILE_NAME_QUERY_DEFAULT,
 		&NameInfo);
-	UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");
-	if (NT_SUCCESS(status))
-	{
-		if (RtlEqualUnicodeString(&required_extension, &NameInfo->Extension, FALSE) == TRUE) {
 
-			if (Data->Iopb->MajorFunction == IRP_MJ_READ) {
-				DbgPrint("[PassThrough] Reading file: %wZ | %wZ\n", NameInfo->Name, NameInfo->Extension);
-				// Decrypting is gonna be here
-				if (Data->Iopb->Parameters.Read.ReadBuffer) {
-					DbgPrint("[PassThrough] Read. Input: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
-					try
-					{
-						// Создание и заполнение буфера
-						uint8_t buffer[128];
-						memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
+	/*UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");*/
+	if (NT_SUCCESS(status)) {
+		if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &EMPTY, FALSE) != TRUE) {
+			if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &NameInfo->Extension, FALSE) == TRUE) {
+				DbgPrint("[PassThrough] Reading\n");
+				DbgPrint("[PassThrough] UNICODE buffer: %wZ\n", PrivateData->requiredExtension);
+				/*if (Data->Iopb->MajorFunction == IRP_MJ_READ) {
+					DbgPrint("[PassThrough] Reading file: %wZ | %wZ\n", NameInfo->Name, NameInfo->Extension);
+					if (Data->Iopb->Parameters.Read.ReadBuffer) {
+						DbgPrint("[PassThrough] Read. Input: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
+						try {
+							uint8_t buffer[128];
+							memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
 
-						// Инициализация контекста для шифрования
-						struct AES_ctx ctx;
-						AES_init_ctx_iv(&ctx, KEY, IV);
-						AES_CBC_decrypt_buffer(&ctx, buffer, 128);
+							AES_CBC_decrypt_buffer(&ctx, buffer, 128);
 
-						memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 128);
-
-						DbgPrint("[PassThrough] Read. Output: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
-
-						leave;
+							memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 128);
+							DbgPrint("[PassThrough] Read. Output: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
+						}
+						finally {
+						}
 					}
-					finally
-					{
+					else {
+						DbgPrint("[PassThrough] InBuffer is empty or null\n");
 					}
-				}
-				else {
-					DbgPrint("[PassThrough] InBuffer is empty or null\n");
-				}
+				}*/
 			}
 		}
 	}
