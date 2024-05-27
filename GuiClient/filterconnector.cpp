@@ -81,16 +81,21 @@ HRESULT FilterConnector::connectToDriver(LPCWSTR portName)
             return res;
         }
     }
-
 }
 
-int FilterConnector::sendMessageToDriver(LPCWSTR portName)
+int FilterConnector::sendMessageToDriver(LPCWSTR portName, FltMessage* message)
 {
-    typedef int (*sendMessageToDriverFunction)(HANDLE);
+    typedef int (*sendMessageToDriverFunction)(HANDLE, FltMessage*);
 
     sendMessageToDriverFunction sendMessageToDriver = (sendMessageToDriverFunction) lib.resolve("sendMessage");
 
     if (sendMessageToDriver) {
-        return sendMessageToDriver(this->hPort);
+        // char k[33] = "keykeykeykeykeykeykeykeykeykeyk\0";
+        // wchar_t e[33] = L"abcdefghijklmnopqrstuvwxyz123456";
+        // wchar_t e[32] = L"12345678";
+        // FltMessage msg(k, e);
+        return sendMessageToDriver(this->hPort, message);
+    } else {
+        return -1;
     }
 }
