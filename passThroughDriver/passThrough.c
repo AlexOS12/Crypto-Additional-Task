@@ -26,9 +26,12 @@ Environment:
 
 #pragma prefast(disable:__WARNING_ENCODE_MEMBER_FUNCTION_POINTER, "Not valid for kernel mode drivers")
 
+//struct AES_ctx ctx;
+
 typedef struct _DriverData {
-	UNICODE_STRING requiredExtension;
-	struct AES_ctx ctx;
+	wchar_t req[32];
+	char key[33];
+	//struct AES_ctx ctx;
 } DriverData, * PDriverData;
 
 struct ClientData {
@@ -36,23 +39,15 @@ struct ClientData {
 	wchar_t ext[32];
 };
 
+//wchar_t req[32];
 PFLT_FILTER gFilterHandle;
 PFLT_PORT ServerPort = NULL;
 PFLT_PORT ClientPort = NULL;
 
-PDRIVER_OBJECT gDriverObject;
+uint8_t initStatus = 0;
 
-CONST UNICODE_STRING EMPTY = RTL_CONSTANT_STRING(L"");
-
-//UNICODE_STRING inputExt;
 PDriverData PrivateData;
 
-//
-//typedef struct _HIDDEN_DATA {
-//	UNICODE_STRING    HFile;
-//} HIDDEN_DATA, * PHIDDEN_DATA;
-//PHIDDEN_DATA gHiddenData;
-//
 
 /*************************************************************************
 	Prototypes
@@ -118,6 +113,11 @@ PtPostOperationPassThrough(
 	_In_ FLT_POST_OPERATION_FLAGS Flags
 );
 #pragma endregion
+
+#ifdef ALLOC_PRAGMA
+#pragma alloc_text(INIT, DriverEntry)
+#pragma alloc_text(PAGE, PtUnload)
+#endif
 
 //
 //  operation registration
@@ -189,20 +189,13 @@ Return Value:
 
 --*/
 {
-	//gHiddenData = ExAllocatePoolWithTag(NonPagedPool, sizeof(DriverData), 'reqE');
-	PrivateData = ExAllocatePoolWithTag(NonPagedPool, sizeof(DriverData), 'reqE');
-	RtlInitUnicodeString(&PrivateData->requiredExtension, L"");
-	DbgPrint("[PassThrough] init p: %p \n", PrivateData);
-	DbgPrint("[PassThrough] init size: %d \n", sizeof(PrivateData));
-	DbgPrint("[PassThrough] init length: %u \n", PrivateData->requiredExtension.Length);
-	DbgPrint("[PassThrough] init ext: %wZ \n", PrivateData->requiredExtension);
-	DbgPrint("[PassThrough] init ext p: %p \n", &PrivateData->requiredExtension);
-	DbgPrint("[PassThrough] init ctx: %p \n", &PrivateData->ctx);
+	PrivateData = ExAllocatePoolWithTag(NonPagedPool | POOL_FLAG_NON_PAGED_EXECUTE, sizeof(DriverData), 'reqE');
 
-
+	//wchar_t temp[32] = { 0 };
+	//memcpy(req, temp, sizeof(temp));
+	//memcpy(PrivateData->req, temp, sizeof(temp));
 
 	NTSTATUS status;
-	gDriverObject = DriverObject;
 	status = FltRegisterFilter(DriverObject,
 		&FilterRegistration,
 		&gFilterHandle);
@@ -288,42 +281,14 @@ ClientMessage(IN PVOID ConnectionCookie,
 
 		struct ClientData input;
 		memcpy(&input, InputBuffer, sizeof(struct ClientData));
-		//================================================
-		/*RtlInitUnicodeString(&inputExt, input.ext);
-
-		DbgPrint("[PassThrough] unicode maxlength: %u \n", inputExt.MaximumLength);
-		DbgPrint("[PassThrough] unicode length: %u \n", inputExt.Length);
-		DbgPrint("[PassThrough] unicode buffer: %wZ \n", &inputExt);*/
-		//================================================
-		//PrivateData->requiredExtension = inputExt;
-		RtlInitUnicodeString(&PrivateData->requiredExtension, input.ext);
-
-		DbgPrint("[PassThrough] private UNICODE maxlength: %u \n", PrivateData->requiredExtension.MaximumLength);
-		DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
-		DbgPrint("[PassThrough] private UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
-
-		//AES_init_ctx_iv(&ctx, input.key, input.key);
 
 		DbgPrint("[PassThrough] Client struct key: %s | extension: %ws\n", input.key, input.ext);
 
-		//==================TEST`S========================
-
-		UNICODE_STRING test;
-		RtlInitUnicodeString(&test, L"super");
-		int t = RtlEqualUnicodeString(&PrivateData->requiredExtension, &test, FALSE) == TRUE;
-			
-
-		/*RtlInitUnicodeString(&PrivateData->requiredExtension, L"test");
-
-		DbgPrint("[PassThrough] private UNICODE maxlength: %u \n", PrivateData->requiredExtension.MaximumLength);
-		DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
-		DbgPrint("[PassThrough] private UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
-
-		UNICODE_STRING test2;
-		RtlInitUnicodeString(&test2, L"test");
-		int t2 = RtlEqualUnicodeString(&PrivateData->requiredExtension, &test2, FALSE) == TRUE;
-		DbgPrint("[PassThrough] test: %d \n", t2);*/
-
+		memcpy(&PrivateData->req, input.ext, sizeof(PrivateData->req));
+		DbgPrint("[PassThrough] Message req: %ws\n", input.ext);
+		memcpy(&PrivateData->key, input.key, sizeof(PrivateData->key));
+		DbgPrint("[PassThrough] Message key: %s\n", input.key);
+		initStatus = 1;
 	}
 	return STATUS_SUCCESS;
 }
@@ -349,6 +314,8 @@ Return Value:
 
 --*/
 {
+	PAGED_CODE();
+
 	DbgPrint("[PassThrough] Driver unload\n\r");
 	FltCloseCommunicationPort(ServerPort);
 	FltUnregisterFilter(gFilterHandle);
@@ -403,28 +370,33 @@ Return Value:
 		FLT_FILE_NAME_NORMALIZED |
 		FLT_FILE_NAME_QUERY_DEFAULT,
 		&NameInfo);
-	//UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");
 	if (NT_SUCCESS(status)) {
-		if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &EMPTY, FALSE) != TRUE) {
-			DbgPrint("[PassThrough] storage: %p \n", PrivateData);
-			DbgPrint("[PassThrough] UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
-			DbgPrint("[PassThrough] ext p: %p \n", &PrivateData->requiredExtension);
-			DbgPrint("[PassThrough] private UNICODE length: %u \n", PrivateData->requiredExtension.Length);
+		if (initStatus)
+		{
+			UNICODE_STRING required_extension;
+			//RtlInitUnicodeString(&required_extension, req);
+			RtlInitUnicodeString(&required_extension, &PrivateData->req);
 
-			if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &NameInfo->Extension, FALSE) == TRUE) {
-				DbgPrint("[PassThrough] WRITING\n");
-				DbgPrint("[PassThrough] UNICODE buffer: %wZ \n", &PrivateData->requiredExtension);
-				/*if (Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
+			if (RtlCompareUnicodeString(&required_extension, &NameInfo->Extension, TRUE) == 0) {
+				if (Data->Iopb->MajorFunction == IRP_MJ_WRITE) {
+					DbgPrint("[PassThrough] WRITING\n");
 					if (Data->Iopb->Parameters.Write.WriteBuffer) {
 						try {
 							DbgPrint("[PassThrough] Write. Input: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
 
-							uint8_t buffer[128];
-							memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 128);
+							uint8_t buffer[256];
+							memcpy(buffer, Data->Iopb->Parameters.Write.WriteBuffer, 256);
 
-							AES_CBC_encrypt_buffer(&ctx, buffer, 128);
+							struct AES_ctx ctx;
+							AES_init_ctx_iv(&ctx, &PrivateData->key, &PrivateData->key);
 
-							memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 128);
+							/*AES_CBC_encrypt_buffer(&ctx, buffer, 256);
+							DbgPrint("[PassThrough] AES: %u\n", ctx.Iv);*/
+							AES_CBC_encrypt_buffer(&ctx, buffer, 256);
+							DbgPrint("[PassThrough] AES: %u\n", &ctx.Iv);
+
+
+							memcpy(Data->Iopb->Parameters.Write.WriteBuffer, buffer, 256);
 							DbgPrint("[PassThrough] Write. Output: %s\n", Data->Iopb->Parameters.Write.WriteBuffer);
 						}
 						finally {
@@ -433,7 +405,7 @@ Return Value:
 					else {
 						DbgPrint("[PassThrough] InBuffer is empty or null\n");
 					}
-				}*/
+				}
 			}
 		}
 	}
@@ -484,23 +456,28 @@ Return Value:
 		FLT_FILE_NAME_QUERY_DEFAULT,
 		&NameInfo);
 
-	/*UNICODE_STRING required_extension = RTL_CONSTANT_STRING(L"supersecure");*/
 	if (NT_SUCCESS(status)) {
-		if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &EMPTY, FALSE) != TRUE) {
-			if (RtlEqualUnicodeString(&PrivateData->requiredExtension, &NameInfo->Extension, FALSE) == TRUE) {
-				DbgPrint("[PassThrough] Reading\n");
-				DbgPrint("[PassThrough] UNICODE buffer: %wZ\n", PrivateData->requiredExtension);
-				/*if (Data->Iopb->MajorFunction == IRP_MJ_READ) {
+		if (initStatus) {
+			UNICODE_STRING required_extension;
+			RtlInitUnicodeString(&required_extension, &PrivateData->req);
+
+			if (RtlCompareUnicodeString(&required_extension, &NameInfo->Extension, TRUE) == 0) {
+				if (Data->Iopb->MajorFunction == IRP_MJ_READ) {
 					DbgPrint("[PassThrough] Reading file: %wZ | %wZ\n", NameInfo->Name, NameInfo->Extension);
-					if (Data->Iopb->Parameters.Read.ReadBuffer) {
+					if (Data->Iopb->Parameters.Read.ReadBuffer && Data->Iopb->Parameters.Read.Length > 1) {
 						DbgPrint("[PassThrough] Read. Input: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
+						DbgPrint("[PassThrough] Read. Len: %d\n", Data->Iopb->Parameters.Read.Length);
 						try {
-							uint8_t buffer[128];
-							memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 128);
+							uint8_t buffer[256];
+							memcpy(buffer, Data->Iopb->Parameters.Read.ReadBuffer, 256);
 
-							AES_CBC_decrypt_buffer(&ctx, buffer, 128);
+							struct AES_ctx ctx;
+							AES_init_ctx_iv(&ctx, &PrivateData->key, &PrivateData->key);
 
-							memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 128);
+							AES_CBC_decrypt_buffer(&ctx, buffer, 256);
+							DbgPrint("[PassThrough] AES: %u\n", &ctx.Iv);
+
+							memcpy(Data->Iopb->Parameters.Read.ReadBuffer, buffer, 256);
 							DbgPrint("[PassThrough] Read. Output: %s\n", Data->Iopb->Parameters.Read.ReadBuffer);
 						}
 						finally {
@@ -509,7 +486,7 @@ Return Value:
 					else {
 						DbgPrint("[PassThrough] InBuffer is empty or null\n");
 					}
-				}*/
+				}
 			}
 		}
 	}
