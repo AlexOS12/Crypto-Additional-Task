@@ -140,6 +140,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="FLTConnector.h" />
+    <ClInclude Include="FltMessage.h" />
     <ClInclude Include="fltUser.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="pch.h" />

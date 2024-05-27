@@ -6,6 +6,8 @@
 
 #include "Windows.h"
 #include "fltUser.h"
+#include "FltMessage.h"
+
 
 extern "C" {
 	FLTCONNECTOR_API int test(int a, int b);
@@ -19,5 +21,6 @@ extern "C" {
 	FLTCONNECTOR_API int loadDriver(LPCWSTR driverName);
 	FLTCONNECTOR_API int unloadDriver(LPCWSTR driverName);
 	FLTCONNECTOR_API int connectToDriver(LPCWSTR portName, HANDLE *hPort);
-	FLTCONNECTOR_API int sendMessage(HANDLE hPort);
+	FLTCONNECTOR_API int sendMessage(HANDLE hPort, FltMessage* message);
 }
+

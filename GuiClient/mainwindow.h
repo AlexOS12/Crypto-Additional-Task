@@ -36,13 +36,12 @@ private slots:
 
     void on_applyButton_clicked();
 
-    void on_reloadDriverBtn_clicked();
-
     void trayIconActivated(QSystemTrayIcon::ActivationReason reason);
 
-    void reloadDriverSlot();
-
     void on_RedButton_clicked();
+
+    void redBtnActionEvent();
+
 private:
     bool filterLoaded = false;
     BOOL adminRights = FALSE;
@@ -53,7 +52,6 @@ private:
 
     bool ReadSettings();
     bool WriteSettings();
-    bool ReloadDriver();
     bool LoadDriver();
     bool UnloadDriver();
 
@@ -71,8 +69,8 @@ private:
     QMenu *trayIconMenu;
 
     QAction *RestoreAction;
+    QAction *RedButtonAction;
     QAction *CloseAction;
-    QAction *ReloadDriverAction;
 
     void createTrayIcon();
     void createActions();

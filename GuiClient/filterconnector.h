@@ -2,10 +2,11 @@
 #define FILTERCONNECTOR_H
 
 #include <windows.h>
+#include <string>
 #include <QObject>
 #include <QLibrary>
 #include <QDir>
-
+#include "FltMessage.h"
 
 class FilterConnector : public QObject
 {
@@ -22,7 +23,7 @@ public:
     int loadDriver(LPCWSTR driverName);
     int unloadDriver(LPCWSTR driverName);
     HRESULT connectToDriver(LPCWSTR portName);
-    int sendMessageToDriver(LPCWSTR portName);
+    int sendMessageToDriver(LPCWSTR portName, FltMessage *message);
 };
 
 #endif // FILTERCONNECTOR_H

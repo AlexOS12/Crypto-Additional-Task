@@ -28,6 +28,7 @@ if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
         encryptor.cpp encryptor.h
         filterconnector.h filterconnector.cpp
         FLTConnector.h
+        FltMessage.h
 
 
 
