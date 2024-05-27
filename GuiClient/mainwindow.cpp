@@ -10,6 +10,7 @@ MainWindow::MainWindow(QWidget *parent)
     adminRights = IsAppRunningAsAdminMode();
 
     createActions();
+
     createTrayIcon();
 
     if (adminRights) {
@@ -17,19 +18,28 @@ MainWindow::MainWindow(QWidget *parent)
         ui->adminIcoLabel->hide();
         ui->adminStatusLabel->hide();
         ui->RedButton->setIcon(QIcon(":/icons/admin.png"));
-        ui->reloadDriverBtn->setIcon(QIcon(":/icons/admin.png"));
         this->trayIcon->setIcon(QIcon(":/icons/admin.png"));
     } else {
         setWindowTitle("PassThrough Settings");
         ui->RedButton->setEnabled(false);
         ui->RedButton->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
-        ui->reloadDriverBtn->setEnabled(false);
-        ui->reloadDriverBtn->setToolTip("Запустите программу от имени администратора, чтобы выполнить этой действие");
         this->trayIcon->setIcon(QIcon(":/icons/non_admin.png"));
     }
 
 
     trayIcon->show();
+
+    if (!flt.testDLL()) {
+        qDebug() << "Не удалось подключить FLTConnector.dll :(";
+        this->showNotification("Ошибка!", "Не удалось загрузить DLL");
+    }
+
+    if (this->adminRights) {
+        int res = flt.adjustPrivileges();
+        if (res != 0) {
+            this->showNotification("Не удалось получить права", "Не удалось получить права на управление драйвером. Попробуйте перезапустить приложение. Код ошибки: " + QString::number(res));
+        }
+    }
 
     this->settingsFilePath = QDir::homePath() + "/ptsettings.pts";
 
@@ -37,6 +47,8 @@ MainWindow::MainWindow(QWidget *parent)
         ui->KeyLineEdit->setText(this->current.key);
         ui->ExtensionEdit->setText(this->current.extension);
     }
+
+
 }
 
 MainWindow::~MainWindow()
@@ -61,7 +73,7 @@ bool MainWindow::ReadSettings()
 
         QList<QByteArray> parts = decrypted.split('\n');
 
-        PTSettings sets(parts[0], parts[1]);
+        PTSettings sets(parts[0].trimmed(), parts[1].trimmed());
 
         this->current = sets;
         this->old = sets;
@@ -96,27 +108,60 @@ bool MainWindow::WriteSettings()
     return true;
 }
 
-bool MainWindow::ReloadDriver()
-{
-    // TODO
-    // Реализовать перезапуска драйвера тут
-    qDebug() << "Imagine driver is reloading...";
-    showNotification("Reloading Driver", "Imagine Driver is reloading...");
-    return true;
-}
-
 bool MainWindow::LoadDriver()
 {
-    qDebug() << "Imagine driver is loading...";
-    showNotification("Driver Loading", "Imagine driver is loading...");
-    return true;
+    int res = this->flt.loadDriver(L"PassThrough");
+    if (res == 0) {
+        // this->ui->RedButton->setText("Драйвер успешно запущен!");
+        HRESULT res = this->flt.connectToDriver(L"\\PassThrough");
+        if (res != S_OK) {
+            flt.unloadDriver(L"PassThrough");
+            this->showNotification("Не удалось подключиться к драйверу", QString::number(res));
+            return false;
+        }
+        QString initKeyHash = QCryptographicHash::hash(this->current.key.toUtf8(), QCryptographicHash::Md5);
+
+        char key[33];
+
+        for (int i = 0; i < this->current.key.length(); i++)
+            key[i] = this->current.key.at(i).toLatin1();
+
+        wchar_t ext[32] = { 0 };
+
+        this->current.extension.toWCharArray(ext);
+
+        FltMessage initMsg(key, ext);
+
+
+        // showNotification("Debug", QString::fromWCharArray(initMsg.extension));
+
+        if (flt.sendMessageToDriver(L"\\PassThrough", &initMsg) != 0) {
+            this->showNotification("Не удалось отправить сообщение", "");
+            flt.unloadDriver(L"PassThrough");
+            return false;
+        }
+        this->showNotification("Драйвер успешно загружен", "Драйвер был успешно запущен!");
+        this->filterLoaded = true;
+        return true;
+    } else {
+        // this->ui->RedButton->setText(QString::number(res));
+        this->filterLoaded = false;
+        return false;
+    }
 }
 
 bool MainWindow::UnloadDriver()
 {
-    qDebug() << "Imagine driver is unloading...";
-    showNotification("Driver Unloading", "Imagine driver is unloading...");
-    return true;
+    int res = this->flt.unloadDriver(L"PassThrough");
+
+    if (res == 0) {
+        this->showNotification("Драйвер успешно выгружен", "Драйвер был успешно выгружен!");
+        this->filterLoaded = false;
+        return true;
+    } else {
+        this->filterLoaded = true;
+        return false;
+    }
 }
 
 WINBOOL MainWindow::IsAppRunningAsAdminMode()
@@ -176,7 +221,7 @@ void MainWindow::createTrayIcon()
 
     trayIconMenu = new QMenu(this);
     trayIconMenu->addAction(RestoreAction);
-    trayIconMenu->addAction(ReloadDriverAction);
+    trayIconMenu->addAction(RedButtonAction);
     trayIconMenu->addAction(CloseAction);
 
     trayIcon->setContextMenu(trayIconMenu);
@@ -185,22 +230,20 @@ void MainWindow::createTrayIcon()
 
 void MainWindow::createActions()
 {
-
-    this->RestoreAction = new QAction(tr("&Restore"), this);
+    this->RestoreAction = new QAction(tr("&Развернуть"), this);
     connect(RestoreAction, &QAction::triggered, this, &QWidget::showNormal);
 
-    this->ReloadDriverAction = new QAction(tr("&Reload Driver"), this);
+    this->RedButtonAction = new QAction(tr("&Включить драйвер"), this);
+    connect(RedButtonAction, &QAction::triggered, this, &MainWindow::redBtnActionEvent);
 
     if (this->adminRights) {
-        ReloadDriverAction->setIcon(QIcon(":/icons/admin.png"));
+        RedButtonAction->setIcon(QIcon(":/icons/admin.png"));
     } else {
-        ReloadDriverAction->setIcon(QIcon(":/icons/non_admin.png"));
-        ReloadDriverAction->setEnabled(false);
+        RedButtonAction->setIcon(QIcon(":/icons/non_admin.png"));
+        RedButtonAction->setEnabled(false);
     }
 
-    connect(ReloadDriverAction, &QAction::triggered, this, &MainWindow::reloadDriverSlot);
-
-    this->CloseAction = new QAction(tr("&Exit"), this);
+    this->CloseAction = new QAction(tr("&Выйти"), this);
     connect(CloseAction, &QAction::triggered, this, &QApplication::exit);
 }
 
@@ -224,12 +267,29 @@ void MainWindow::on_applyButton_clicked()
 
     this->old = current;
 
-    WriteSettings();
-}
+    if (this->filterLoaded) {
+        QString currentKeyHash = QCryptographicHash::hash(this->current.key.toUtf8(), QCryptographicHash::Md5);
 
-void MainWindow::on_reloadDriverBtn_clicked()
-{
-    ReloadDriver();
+        char key[33];
+
+        for (int i = 0; i < currentKeyHash.length(); i++)
+            key[i] = currentKeyHash.at(i).toLatin1();
+
+        wchar_t ext[32] = { 0 };
+
+        this->current.extension.toWCharArray(ext);
+
+        FltMessage msg(key, ext);
+        int res = flt.sendMessageToDriver(L"\\PassThrough", &msg);
+
+        if (!res) {
+            this->showNotification("Настройки драйвера Успешно обновлены", "");
+        } else {
+            this->showNotification("Не удалось обновить настройки драйвера", "Код ошибки: " + QString::number(res));
+        }
+    }
+
+    WriteSettings();
 }
 
 void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
@@ -243,15 +303,32 @@ void MainWindow::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
     }
 }
 
-void MainWindow::reloadDriverSlot()
-{
-    ReloadDriver();
-}
-
 
 void MainWindow::on_RedButton_clicked()
 {
-    LoadDriver();
+    if (!this->filterLoaded) {
+        if (LoadDriver()) {
+            this->ui->RedButton->setText("Выключить драйвер");
+            this->RedButtonAction->setText("Выключить драйвер");
+        }
+    } else {
+        if (UnloadDriver())
+            this->ui->RedButton->setText("Включить драйвер");
+            this->RedButtonAction->setText("Включить драйвер");
+    }
+}
+
+void MainWindow::redBtnActionEvent()
+{
+    if (!this->filterLoaded) {
+        if (this->LoadDriver())
+            this->ui->RedButton->setText("Выключить драйвер");
+            this->RedButtonAction->setText("Выключить драйвер");
+    } else {
+        if(this->UnloadDriver())
+            this->ui->RedButton->setText("Включить драйвер");
+            this->RedButtonAction->setText("Включить драйвер");
+    }
 }
 
 void MainWindow::closeEvent(QCloseEvent *event)
