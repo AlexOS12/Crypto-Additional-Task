@@ -53,7 +53,7 @@ public:
      * \param portName Имя порта драйвера
      * \return S_OK - успех, иначе - ошибка
      */
-    HRESULT connectToDriver(LPCWSTR portName);
+    bool connectToDriver(LPCWSTR portName);
 
     /*!
      * \brief sendMessageToDriver Отправляет сообщения драйверу
