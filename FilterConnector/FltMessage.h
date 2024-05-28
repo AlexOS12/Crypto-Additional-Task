@@ -3,6 +3,9 @@
 
 #include <string>
 
+/// <summary>
+/// Сообщение, которым клиент обменивается с драйвером
+/// </summary>
 struct FltMessage{
     char key[33];
     wchar_t extension[32];

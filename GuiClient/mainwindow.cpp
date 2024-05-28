@@ -112,8 +112,7 @@ bool MainWindow::LoadDriver()
 {
     int res = this->flt.loadDriver(L"PassThrough");
     if (res == 0) {
-        HRESULT res = this->flt.connectToDriver(L"\\PassThrough");
-        if (res != S_OK) {
+        if (!this->flt.connectToDriver(L"\\PassThrough")) {
             flt.unloadDriver(L"PassThrough");
             this->showNotification("Не удалось подключиться к драйверу", QString::number(res));
             return false;
@@ -122,8 +121,8 @@ bool MainWindow::LoadDriver()
 
         char key[33];
 
-        for (int i = 0; i < this->current.key.length(); i++)
-            key[i] = this->current.key.at(i).toLatin1();
+        for (int i = 0; i < initKeyHash.length(); i++)
+            key[i] = initKeyHash.at(i).toLatin1();
 
         wchar_t ext[32] = { 0 };
 
