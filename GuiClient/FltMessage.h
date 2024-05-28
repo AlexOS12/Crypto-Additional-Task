@@ -4,9 +4,12 @@
 #include <string>
 #include <QByteArray>
 
+/*!
+ * \brief Структура сообщения для драйвера
+ */
 struct FltMessage{
-    char key[33];
-    wchar_t extension[32];
+    char key[33]; ///< Ключ для шифрования
+    wchar_t extension[32]; ///< Расширения для расшифрования
 
     FltMessage(char key[33], wchar_t ext[32]) {
         memcpy(this->key, key, 32);
