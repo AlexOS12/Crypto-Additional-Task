@@ -71,15 +71,13 @@ HRESULT FilterConnector::connectToDriver(LPCWSTR portName)
 
     if (connectToDriver) {
         HRESULT res = connectToDriver(portName, &this->hPort);
-        // if (this->hPort != NULL) {
-        //     return true;
-        // }
-
         if (res == S_OK) {
-            return S_OK;
+            return true;
         } else {
             return res;
         }
+    } else {
+        return false;
     }
 }
 
@@ -90,10 +88,6 @@ int FilterConnector::sendMessageToDriver(LPCWSTR portName, FltMessage* message)
     sendMessageToDriverFunction sendMessageToDriver = (sendMessageToDriverFunction) lib.resolve("sendMessage");
 
     if (sendMessageToDriver) {
-        // char k[33] = "keykeykeykeykeykeykeykeykeykeyk\0";
-        // wchar_t e[33] = L"abcdefghijklmnopqrstuvwxyz123456";
-        // wchar_t e[32] = L"12345678";
-        // FltMessage msg(k, e);
         return sendMessageToDriver(this->hPort, message);
     } else {
         return -1;

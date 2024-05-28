@@ -74,6 +74,9 @@
           <height>25</height>
          </size>
         </property>
+        <property name="maxLength">
+         <number>32</number>
+        </property>
        </widget>
       </item>
      </layout>

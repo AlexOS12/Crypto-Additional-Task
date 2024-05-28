@@ -112,7 +112,6 @@ bool MainWindow::LoadDriver()
 {
     int res = this->flt.loadDriver(L"PassThrough");
     if (res == 0) {
-        // this->ui->RedButton->setText("Драйвер успешно запущен!");
         HRESULT res = this->flt.connectToDriver(L"\\PassThrough");
         if (res != S_OK) {
             flt.unloadDriver(L"PassThrough");
@@ -132,9 +131,6 @@ bool MainWindow::LoadDriver()
 
         FltMessage initMsg(key, ext);
 
-
-        // showNotification("Debug", QString::fromWCharArray(initMsg.extension));
-
         if (flt.sendMessageToDriver(L"\\PassThrough", &initMsg) != 0) {
             this->showNotification("Не удалось отправить сообщение", "");
             flt.unloadDriver(L"PassThrough");
@@ -144,7 +140,6 @@ bool MainWindow::LoadDriver()
         this->filterLoaded = true;
         return true;
     } else {
-        // this->ui->RedButton->setText(QString::number(res));
         this->filterLoaded = false;
         return false;
     }
@@ -333,6 +328,9 @@ void MainWindow::redBtnActionEvent()
 
 void MainWindow::closeEvent(QCloseEvent *event)
 {
-    showNotification("App is still running", "This app is still running in the background. To access it use tray icon");
+    if (!this->appIsStillRunningShown) {
+        showNotification("App is still running", "This app is still running in the background. To access it use tray icon");
+        this->appIsStillRunningShown = true;
+    }
 }
 

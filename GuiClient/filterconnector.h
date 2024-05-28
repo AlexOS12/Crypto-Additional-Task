@@ -14,7 +14,6 @@ class FilterConnector : public QObject
 public:
     FilterConnector();
 
-    // QLibrary lib = QLibrary(":/dll/FilterConnector.dll");
     QLibrary lib;
     HANDLE hPort;
     bool testDLL();
