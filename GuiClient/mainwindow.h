@@ -44,6 +44,7 @@ private slots:
 
 private:
     bool filterLoaded = false;
+    bool appIsStillRunningShown = false;
     BOOL adminRights = FALSE;
     QString settingsFilePath;
     FilterConnector flt;
